@@ -188,12 +188,13 @@ func delegateStake(
 	iterationLog(
 		m.T,
 		iteration,
+		"delegating stake",
 		delegator,
-		"delegated in topic id ",
-		topicId,
-		"upon reputer ",
+		"upon reputer",
 		reputer,
-		" in amount ",
+		"in topic id",
+		topicId,
+		" in amount",
 		amount.String(),
 	)
 }
