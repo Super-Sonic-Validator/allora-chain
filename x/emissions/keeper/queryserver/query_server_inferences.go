@@ -51,7 +51,10 @@ func (qs queryServer) GetInferencesAtBlock(ctx context.Context, req *types.Query
 }
 
 // Return full set of inferences in I_i from the chain
-func (qs queryServer) GetNetworkInferencesAtBlock(ctx context.Context, req *types.QueryNetworkInferencesAtBlockRequest) (*types.QueryNetworkInferencesAtBlockResponse, error) {
+func (qs queryServer) GetNetworkInferencesAtBlock(
+	ctx context.Context,
+	req *types.QueryNetworkInferencesAtBlockRequest,
+) (*types.QueryNetworkInferencesAtBlockResponse, error) {
 	topic, err := qs.k.GetTopic(ctx, req.TopicId)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "topic %v not found", req.TopicId)
@@ -77,9 +80,9 @@ func (qs queryServer) GetNetworkInferencesAtBlock(ctx context.Context, req *type
 // Return full set of inferences in I_i from the chain, as well as weights and forecast implied inferences
 func (qs queryServer) GetLatestNetworkInference(
 	ctx context.Context,
-	req *types.QueryLatestNetworkInferencesAtBlockRequest,
+	req *types.QueryLatestNetworkInferencesRequest,
 ) (
-	*types.QueryLatestNetworkInferencesAtBlockResponse,
+	*types.QueryLatestNetworkInferencesResponse,
 	error,
 ) {
 	topicExists, err := qs.k.TopicExists(ctx, req.TopicId)
@@ -89,7 +92,7 @@ func (qs queryServer) GetLatestNetworkInference(
 		return nil, err
 	}
 
-	networkInferences, forecastImpliedInferenceByWorker, infererWeights, forecasterWeights, err := synth.GetLatestNetworkInference(
+	networkInferences, forecastImpliedInferenceByWorker, infererWeights, forecasterWeights, inferenceBlockHeight, lossBlockHeight, err := synth.GetLatestNetworkInference(
 		sdk.UnwrapSDKContext(ctx),
 		qs.k,
 		req.TopicId,
@@ -101,10 +104,56 @@ func (qs queryServer) GetLatestNetworkInference(
 	inferers := alloraMath.GetSortedKeys(infererWeights)
 	forecasters := alloraMath.GetSortedKeys(forecasterWeights)
 
-	return &types.QueryLatestNetworkInferencesAtBlockResponse{
+	return &types.QueryLatestNetworkInferencesResponse{
 		NetworkInferences:         networkInferences,
 		InfererWeights:            synth.ConvertWeightsToArrays(inferers, infererWeights),
 		ForecasterWeights:         synth.ConvertWeightsToArrays(forecasters, forecasterWeights),
 		ForecastImpliedInferences: synth.ConvertForecastImpliedInferencesToArrays(forecasters, forecastImpliedInferenceByWorker),
+		InferenceBlockHeight:      inferenceBlockHeight,
+		LossBlockHeight:           lossBlockHeight,
+	}, nil
+}
+
+func (qs queryServer) GetLatestAvailableNetworkInference(
+	ctx context.Context,
+	req *types.QueryLatestNetworkInferencesRequest,
+) (
+	*types.QueryLatestNetworkInferencesResponse,
+	error,
+) {
+
+	lastWorkerCommit, err := qs.k.GetTopicLastWorkerPayload(ctx, req.TopicId)
+	if err != nil {
+		return nil, err
+	}
+
+	lastReputerCommit, err := qs.k.GetTopicLastReputerPayload(ctx, req.TopicId)
+	if err != nil {
+		return nil, err
+	}
+
+	networkInferences, forecastImpliedInferenceByWorker, infererWeights, forecasterWeights, err :=
+		synth.GetNetworkInferencesAtBlock(
+			sdk.UnwrapSDKContext(ctx),
+			qs.k,
+			req.TopicId,
+			lastWorkerCommit.Nonce.BlockHeight,
+			lastReputerCommit.Nonce.BlockHeight,
+		)
+
+	if err != nil {
+		return nil, err
+	}
+
+	inferers := alloraMath.GetSortedKeys(infererWeights)
+	forecasters := alloraMath.GetSortedKeys(forecasterWeights)
+
+	return &types.QueryLatestNetworkInferencesResponse{
+		NetworkInferences:         networkInferences,
+		InfererWeights:            synth.ConvertWeightsToArrays(inferers, infererWeights),
+		ForecasterWeights:         synth.ConvertWeightsToArrays(forecasters, forecasterWeights),
+		ForecastImpliedInferences: synth.ConvertForecastImpliedInferencesToArrays(forecasters, forecastImpliedInferenceByWorker),
+		InferenceBlockHeight:      lastWorkerCommit.Nonce.BlockHeight,
+		LossBlockHeight:           lastReputerCommit.Nonce.BlockHeight,
 	}, nil
 }
