@@ -28,6 +28,28 @@ func (rkm *RandomKeyMap[K, V]) Get(k K) (V, bool) {
 	return valueIndex.v, ok
 }
 
+// GetAll returns all elements from the map
+func (rkm *RandomKeyMap[K, V]) GetAll() []V {
+	values := make([]V, len(rkm.s))
+	for i, k := range rkm.s {
+		values[i] = rkm.m[k].v
+	}
+	return values
+}
+
+// Filter returns all elements from the map that satisfy the predicate
+func (rkm *RandomKeyMap[K, V]) Filter(f func(K) bool) ([]K, []V) {
+	keys := make([]K, 0)
+	values := make([]V, 0)
+	for _, k := range rkm.s {
+		if f(k) {
+			keys = append(keys, k)
+			values = append(values, rkm.m[k].v)
+		}
+	}
+	return keys, values
+}
+
 // Upsert element into the map
 func (rkm *RandomKeyMap[K, V]) Upsert(k K, v V) {
 	if valueIndex, ok := rkm.m[k]; ok {

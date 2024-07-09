@@ -78,7 +78,7 @@ func allTransitions() []StateTransition {
 // collectDelegatorRewards: delegateStake, fundTopic, InsertBulkWorkerPayload, InsertBulkReputerPayload
 // InsertBulkWorkerPayload: RegisterWorkerForTopic, FundTopic
 // InsertBulkReputerPayload: RegisterReputerForTopic, InsertBulkWorkerPayload
-func canTransitionOccur(data *SimulationData, transition StateTransition) bool {
+func canTransitionOccur(m *testcommon.TestConfig, data *SimulationData, transition StateTransition) bool {
 	switch transition.name {
 	case "unregisterWorker":
 		return anyWorkersRegistered(data)
@@ -93,14 +93,14 @@ func canTransitionOccur(data *SimulationData, transition StateTransition) bool {
 	case "undelegateStake":
 		return anyDelegatorsStaked(data)
 	case "collectDelegatorRewards":
-		return anyDelegatorsStaked(data)
+		return anyDelegatorsStaked(data) && anyReputersRegistered(data)
+	case "produceInferenceAndReputation":
+		return findIfActiveTopics(m, data)
 
 	// NOT YET IMPLEMENTED
 	case "cancelStakeRemoval":
 		return false
 	case "cancelDelegateStakeRemoval":
-		return false
-	case "produceInferenceAndReputation":
 		return false
 	default:
 		return true
@@ -133,7 +133,7 @@ func pickStateTransition(
 	for {
 		randIndex := m.Client.Rand.Intn(len(transitions))
 		selectedTransition := transitions[randIndex]
-		if canTransitionOccur(data, selectedTransition) {
+		if canTransitionOccur(m, data, selectedTransition) {
 			return selectedTransition
 		} else {
 			iterationLog(m.T, iteration, "Transition not possible: ", selectedTransition.name)
@@ -201,6 +201,13 @@ func pickActorAndTopicIdForStateTransition(
 	case "collectDelegatorRewards":
 		delegator, reputer, topicId := data.pickRandomStakedDelegator()
 		return delegator, reputer, nil, topicId
+	case "produceInferenceAndReputation":
+		topicId := getActiveTopicId(m)
+		worker, err := data.pickRandomWorkerRegisteredInTopic(m.Client.Rand, topicId)
+		require.NoError(m.T, err)
+		reputer, err := data.pickRandomReputerStakedInTopic(m.Client.Rand, topicId)
+		require.NoError(m.T, err)
+		return worker, reputer, nil, topicId
 	default:
 		randomTopicId, err := pickRandomTopicId(m)
 		require.NoError(m.T, err)

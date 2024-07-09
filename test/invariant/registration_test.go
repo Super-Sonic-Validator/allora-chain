@@ -9,6 +9,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// determine if this state transition is worth trying based on our knowledge of the state
+func anyWorkersRegistered(data *SimulationData) bool {
+	return data.registeredWorkers.Len() > 0
+}
+
+// determine if this state transition is worth trying based on our knowledge of the state
+func anyReputersRegistered(data *SimulationData) bool {
+	return data.registeredReputers.Len() > 0
+}
+
 // register actor as a new worker in topicId
 func registerWorker(
 	m *testcommon.TestConfig,
@@ -42,11 +52,6 @@ func registerWorker(
 	data.addWorkerRegistration(topicId, actor)
 	data.counts.incrementRegisterWorkerCount()
 	iterationLog(m.T, iteration, "registered ", actor, "as worker in topic id ", topicId)
-}
-
-// determine if this state transition is worth trying based on our knowledge of the state
-func anyWorkersRegistered(data *SimulationData) bool {
-	return data.registeredWorkers.Len() > 0
 }
 
 // unregister actor from being a worker in topic topicId
@@ -114,11 +119,6 @@ func registerReputer(
 	data.addReputerRegistration(topicId, actor)
 	data.counts.incrementRegisterReputerCount()
 	iterationLog(m.T, iteration, "registered ", actor, "as reputer in topic id ", topicId)
-}
-
-// determine if this state transition is worth trying based on our knowledge of the state
-func anyReputersRegistered(data *SimulationData) bool {
-	return data.registeredReputers.Len() > 0
 }
 
 // unregister actor as a reputer in topicId

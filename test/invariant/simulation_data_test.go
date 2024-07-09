@@ -1,8 +1,10 @@
 package invariant_test
 
 import (
+	"cmp"
 	"fmt"
 	"math/rand"
+	"slices"
 
 	cosmossdk_io_math "cosmossdk.io/math"
 	testcommon "github.com/allora-network/allora-chain/test/common"
@@ -55,6 +57,7 @@ func (s *SimulationData) addWorkerRegistration(topicId uint64, actor Actor) {
 	}, struct{}{})
 }
 
+// removeWorkerRegistration removes a worker registration from the simulation data
 func (s *SimulationData) removeWorkerRegistration(topicId uint64, actor Actor) {
 	s.registeredWorkers.Delete(Registration{
 		TopicId: topicId,
@@ -70,6 +73,7 @@ func (s *SimulationData) addReputerRegistration(topicId uint64, actor Actor) {
 	}, struct{}{})
 }
 
+// removeReputerRegistration removes a reputer registration from the simulation data
 func (s *SimulationData) removeReputerRegistration(topicId uint64, actor Actor) {
 	s.registeredReputers.Delete(Registration{
 		TopicId: topicId,
@@ -268,4 +272,60 @@ func (s *SimulationData) isReputerRegistered(topicId uint64, actor Actor) bool {
 		Actor:   actor,
 	})
 	return exists
+}
+
+// pick a random worker from a topic. This function is O(n) over the list of workers
+func (s *SimulationData) pickRandomWorkerRegisteredInTopic(rand *rand.Rand, topicId uint64) (Actor, error) {
+	workers, _ := s.registeredWorkers.Filter(func(reg Registration) bool {
+		return reg.TopicId == topicId
+	})
+	if len(workers) == 0 {
+		return Actor{}, fmt.Errorf("no workers in topic %d", topicId)
+	}
+	randIndex := rand.Intn(len(workers))
+	return workers[randIndex].Actor, nil
+}
+
+// get all workers for a topic, this function is iterates over the list of workers multiple times
+// for determinism, the workers are sorted by their address
+func (s *SimulationData) getWorkersForTopic(topicId uint64) []Actor {
+	workers, _ := s.registeredWorkers.Filter(func(reg Registration) bool {
+		return reg.TopicId == topicId
+	})
+	ret := make([]Actor, len(workers))
+	for i, worker := range workers {
+		ret[i] = worker.Actor
+	}
+	slices.SortFunc(ret, func(a, b Actor) int {
+		return cmp.Compare(a.addr, b.addr)
+	})
+	return ret
+}
+
+// pick a random reputer from a topic. This function is O(n) over the list of reputers
+func (s *SimulationData) pickRandomReputerStakedInTopic(rand *rand.Rand, topicId uint64) (Actor, error) {
+	reputers, _ := s.reputerStakes.Filter(func(reg Registration) bool {
+		return reg.TopicId == topicId
+	})
+	if len(reputers) == 0 {
+		return Actor{}, fmt.Errorf("no reputers in topic %d", topicId)
+	}
+	randIndex := rand.Intn(len(reputers))
+	return reputers[randIndex].Actor, nil
+}
+
+// get all staked reputers for a topic, this function is iterates over the list of reputers multiple times
+// for determinism, the reputers are sorted by their address
+func (s *SimulationData) getReputersForTopic(topicId uint64) []Actor {
+	reputers, _ := s.reputerStakes.Filter(func(reg Registration) bool {
+		return reg.TopicId == topicId
+	})
+	ret := make([]Actor, len(reputers))
+	for i, reputer := range reputers {
+		ret[i] = reputer.Actor
+	}
+	slices.SortFunc(ret, func(a, b Actor) int {
+		return cmp.Compare(a.addr, b.addr)
+	})
+	return ret
 }
