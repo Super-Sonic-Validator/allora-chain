@@ -147,12 +147,18 @@ func pickRandomActor(m *testcommon.TestConfig, data *SimulationData) Actor {
 }
 
 // pickRandomActorExcept picks a random actor from the list of actors in the simulation data
-// and panics if it can't find one after 5 tries that is not the same as the given actor
-func pickRandomActorExcept(m *testcommon.TestConfig, data *SimulationData, actor Actor) Actor {
+// and panics if it can't find one after 5 tries that is not the same as the given actors
+func pickRandomActorExcept(m *testcommon.TestConfig, data *SimulationData, actors []Actor) Actor {
 	count := 0
 	for ; count < 5; count++ {
 		randomActor := pickRandomActor(m, data)
-		if randomActor != actor {
+		match := false
+		for _, actor := range actors {
+			if randomActor == actor {
+				match = true
+			}
+		}
+		if !match {
 			return randomActor
 		}
 	}
@@ -186,7 +192,7 @@ func pickActorAndTopicIdForStateTransition(
 		return reputer, Actor{}, &amount, topicId
 	case "delegateStake":
 		reputer, topicId := data.pickRandomRegisteredReputer()
-		delegator := pickRandomActorExcept(m, data, reputer)
+		delegator := pickRandomActorExcept(m, data, []Actor{reputer})
 		amount, err := pickRandomBalanceLessThanHalf(m, delegator)
 		require.NoError(m.T, err)
 		return delegator, reputer, &amount, topicId

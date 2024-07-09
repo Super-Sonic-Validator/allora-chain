@@ -1,6 +1,8 @@
 package invariant_test
 
 import (
+	"context"
+
 	cosmossdk_io_math "cosmossdk.io/math"
 	testcommon "github.com/allora-network/allora-chain/test/common"
 )
@@ -72,7 +74,7 @@ func simulate(
 // if you need to directly simulate some activity in a test
 // say, to reproduce an issue
 // you can do so here and it will occur in the same way as the simulator
-const MANUAL_SIMULATION = false
+const MANUAL_SIMULATION = true
 
 // this is the body of the "manual" simulation mode
 // put your code here if you wish to manually send transactions
@@ -82,19 +84,33 @@ func simulateManual(
 	faucet Actor,
 	simulationData *SimulationData,
 ) {
-	iterationLog(m.T, 0, "manual simulation mode: ", faucet, simulationData)
-	// example of something you could test:
-	/*
-		createTopic(m, faucet, Actor{}, nil, 0, simulationData, 0)
-		reputer := pickRandomActorExcept(m, simulationData, faucet)
-		delegator := pickRandomActorExcept(m, simulationData, reputer)
-		registerReputer(m, reputer, Actor{}, nil, 1, simulationData, 1)
-		amount := cosmossdk_io_math.NewInt(1e10)
-		delegateStake(m, delegator, reputer, &amount, 1, simulationData, 2)
-		unregisterReputer(m, reputer, Actor{}, nil, 1, simulationData, 3)
-		registerReputer(m, reputer, Actor{}, nil, 1, simulationData, 4)
-		collectDelegatorRewards(m, delegator, reputer, nil, 1, simulationData, 5)
-	*/
+	iterationLog(m.T, 0, "manual simulation mode")
+	reputer := pickRandomActor(m, simulationData)
+	delegator := pickRandomActorExcept(m, simulationData, []Actor{reputer})
+	worker := pickRandomActorExcept(m, simulationData, []Actor{reputer, delegator})
+	reputerWithoutStake := pickRandomActorExcept(m, simulationData, []Actor{reputer, delegator, worker})
+	amount := cosmossdk_io_math.NewInt(1e10)
+
+	// create topic
+	createTopic(m, faucet, Actor{}, nil, 0, simulationData, 0)
+	// register reputer
+	registerReputer(m, reputer, Actor{}, nil, 1, simulationData, 1)
+	// delegate from delegator on reputer
+	delegateStake(m, delegator, reputer, &amount, 1, simulationData, 2)
+	// register reputer without stake
+	registerReputer(m, reputerWithoutStake, Actor{}, nil, 1, simulationData, 3)
+	// unregister reputer
+	unregisterReputer(m, reputer, Actor{}, nil, 1, simulationData, 4)
+	// fund the topic from delegator
+	fundTopic(m, delegator, Actor{}, &amount, 1, simulationData, 5)
+	// register worker
+	registerWorker(m, worker, Actor{}, nil, 1, simulationData, 6)
+	// now nobody has stake, is the topic active?
+	// make sure an ABCI endblock has passed
+	ctx := context.Background()
+	m.Client.WaitForNextBlock(ctx)
+	isActive := findIfActiveTopics(m, simulationData)
+	m.T.Log("Is topic active?", isActive)
 }
 
 // this is the body of the "normal" simulation mode
